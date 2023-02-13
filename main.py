@@ -6,7 +6,7 @@
 import xml.etree.ElementTree as ET
 import cv2
 from tkinter import *
-from tkinter import Tk, Button, Label, PhotoImage, ttk, messagebox, filedialog
+from tkinter import filedialog
 import tkinter
 import os
 import math
@@ -265,8 +265,6 @@ def cut_sprites(image_file, xml_file):
     image = cv2.imread(f"{image_file}", cv2.IMREAD_UNCHANGED)
 
     # Parse the XML file
-    if xml_file is None:
-        print(f"Error: No imagelist provided, sprites cannot be extracted.")
     tree = ET.parse(f"{xml_file}")
     root = tree.getroot()
 
