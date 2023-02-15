@@ -5,8 +5,7 @@
 
 import xml.etree.ElementTree as ET
 import cv2
-from tkinter import *
-from tkinter import filedialog
+from tkinter import Tk, filedialog
 import tkinter
 import os
 import math
