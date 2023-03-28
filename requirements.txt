@@ -2,3 +2,4 @@ Pillow
 numpy
 lxml
 opencv-python
+colorama
