@@ -1,17 +1,103 @@
 # Thanks to @campbellsonic for the wrapRawData script. It was originally written in C#.
 # Thanks to @ego-lay-atman-bay for the rewrite in python.
 # Thanks to @LolHacksRule for the "weird widths" hack.
-# Sprite cutting capability by @E12Dragon
+# Sprite cutting capability and interface options by @E12Dragon
 
 import xml.etree.ElementTree as ET
 import cv2
-from tkinter import Tk, filedialog
-import tkinter
+from os import system
 import os
+import shutil
 import math
 import numpy
 from PIL import Image
+from tkinter import Tk, filedialog
+import tkinter
+from colorama import init, Fore, Back, Style
 
+# Initializes Colorama
+init(autoreset=True)
+
+# Close window function
+def clear_directory(dir_path):
+    # check if the directory exists
+    if os.path.exists(dir_path):
+
+        # remove all files and folders in the directory
+        for filename in os.listdir(dir_path):
+            file_path = os.path.join(dir_path, filename)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)
+                elif os.path.isdir(file_path):
+                    shutil.rmtree(file_path)
+            except Exception as e:
+                print(Fore.RED + f'Failed to delete {file_path}. Reason: {e}')
+        print(Fore.GREEN + f'"{dir_path}" directory has been cleared!')
+    else:
+        print(Fore.RED + f'{dir_path} does not exist.')
+# Pulls information from a give waltex file by rading bytes from the header
+def DefineWaltex(image_file):
+    if image_file.endswith("waltex"):
+        with open(image_file, "rb") as f:
+            rawdata = f.read()
+        if rawdata[:4].decode("utf-8") != "WALT":
+            raise ValueError(Fore.RED + "Not a valid WALTex file")
+        tex_fmt = rawdata[5]
+        tex_size = rawdata[7]
+        #Find what waltex format it is
+        if tex_fmt == 0x0:
+            print('WALTEX rgba8888 format detected.')
+            rawcolor = 'abgr8888'
+            offset = 16
+            width = int.from_bytes(rawdata[6:8], "little")
+            height = int.from_bytes(rawdata[8:10], "little")
+        elif tex_fmt == 0x3:
+            rawcolor = 'rgba4444'
+            offset = 16
+            #Some rgba4444s have width and height flipped, this byte seems to be the answer
+            if tex_size == 0x3:
+                print('WALTEX rgba4444 format detected. Flipped dimensions.')
+                height = int.from_bytes(rawdata[6:8], "little")
+                width = int.from_bytes(rawdata[8:10], "little")
+            #Normal version
+            else:
+                print('WALTEX rgba4444 format detected.')
+                width = int.from_bytes(rawdata[6:8], "little")
+                height = int.from_bytes(rawdata[8:10], "little")
+        else:
+            raise ValueError(Fore.RED + "Unknown texture format")
+            
+        #Some textures are dumb and have weird widths. This seems to occur with textures that only have a single sprite.
+        if (width != 32 and width != 64 and width != 128 and width != 256 and width != 512 and width != 1024 and width != 2048 and width != 4096):
+                    print("Unusual width detected. Adjusting automatically!")
+                    if (width < 32):
+                        width = 32
+                    if (width > 32 and width < 64):
+                        width = 64
+                    if (width > 64 and width < 128):
+                        width = 128
+                    if (width > 128 and width < 256):
+                        width = 256
+                    if (width > 256 and width < 512):
+                        width = 512
+                    if (width > 512 and width < 1024):
+                        width = 1024
+                    if (width > 1024 and width < 2048):
+                        width = 2048
+                    if (width > 2048):
+                        width = 4096
+            
+        print(Fore.YELLOW + f"Converting {(os.path.basename(image_file))}...")
+
+        waltex_image = WaltexImage(image_file, (width, height), rawcolor, 'false', 'false', 'little', offset)
+        output_name = os.path.basename(image_file).split('.')[0] + '.png'
+        output_dir = "out-waltex"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        waltex_image.save('out-waltex/' + output_name, "PNG")
+        print(Fore.GREEN + f"Saved WALTEX as {output_name}")
+    
 def WaltexImage(image_file : str, size : tuple = (1024, 1024), colorspace : str = 'rgba4444', premultiplyAlpha : bool = False, dePremultiplyAlpha : bool = False, endian : str = 'little', offset : int = 0) -> Image.Image:
     """Get image from `waltex` file
     Data on image can be found in coorisponding `imagelist` or in `Data/TextureSettings.xml`.
@@ -202,64 +288,9 @@ def GenerateBinaryMask(numOnes):
 def cut_sprites(image_file, xml_file):
     # Give waltex files the treatment they need
     if image_file.endswith("waltex"):
-        with open(image_file, "rb") as f:
-            rawdata = f.read()
-        if rawdata[:4].decode("utf-8") != "WALT":
-            raise ValueError("Not a valid WALTex file")
-        tex_fmt = rawdata[5]
-        tex_size = rawdata[7]
-        #Find what waltex format it is
-        if tex_fmt == 0x0:
-            print('rgba8888 format detected.')
-            rawcolor = 'abgr8888'
-            offset = 16
-            width = int.from_bytes(rawdata[6:8], "little")
-            height = int.from_bytes(rawdata[8:10], "little")
-        elif tex_fmt == 0x3:
-            rawcolor = 'rgba4444'
-            offset = 16
-            #Some rgba4444s have width and height flipped, this byte seems to be the answer
-            if tex_size == 0x3:
-                print('rgba4444 format detected. Flipped dimensions.')
-                height = int.from_bytes(rawdata[6:8], "little")
-                width = int.from_bytes(rawdata[8:10], "little")
-            #Normal version
-            else:
-                print('rgba4444 format detected.')
-                width = int.from_bytes(rawdata[6:8], "little")
-                height = int.from_bytes(rawdata[8:10], "little")
-        else:
-            raise ValueError("Unknown texture format")
-            
-        #Some textures are dumb and have weird widths. This seems to occur with textures that only have a single sprite.
-        if (width != 32 and width != 64 and width != 128 and width != 256 and width != 512 and width != 1024 and width != 2048 and width != 4096):
-                    print("Unusual width detected. Adjusting automatically!")
-                    if (width < 32):
-                        width = 32
-                    if (width > 32 and width < 64):
-                        width = 64
-                    if (width > 64 and width < 128):
-                        width = 128
-                    if (width > 128 and width < 256):
-                        width = 256
-                    if (width > 256 and width < 512):
-                        width = 512
-                    if (width > 512 and width < 1024):
-                        width = 1024
-                    if (width > 1024 and width < 2048):
-                        width = 2048
-                    if (width > 2048):
-                        width = 4096
-            
-        print(f"Processing {(os.path.basename(image_file))}...")
-
-        image = WaltexImage(image_file, (width, height), rawcolor, 'false', 'false', 'little', offset)
-        #Download as PNG
-        waltex_file = image_file.split('.')[0] + '.png'
-        image_file = waltex_file
-        image.save(os.path.splitext(image_file)[0] + '.png', "PNG")
-        print(f"Saved as {(os.path.basename(image_file))}")
-                    
+        DefineWaltex(image_file)
+        image_file = os.path.join("out-waltex/", os.path.basename(image_file).split(".")[0] + '.png')
+        
     # Load the image using OpenCV
     image = cv2.imread(f"{image_file}", cv2.IMREAD_UNCHANGED)
 
@@ -297,11 +328,11 @@ def cut_sprites(image_file, xml_file):
         image_tags = image_list.findall("Image")
 
     # Check if the output directory exists, if not, create it
-    output_dir = "out"
+    output_dir = "out-sprites"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Create the output directory
+    # Create the output directory for the sprites
     output_name = image_file.split('.')[0]
     subdir  = f"{output_dir}/{os.path.splitext(os.path.basename(image_file))[0]}"
     os.makedirs(subdir , exist_ok=True)
@@ -312,11 +343,11 @@ def cut_sprites(image_file, xml_file):
         name = image_tag.get("name")
         rect = image_tag.get("rect")
         if rect is None:
-            print(f"Error: Image '{name}' does not have a rect attribute")
+            print(Fore.RED + f"Error: Image '{name}' does not have a rect attribute")
             continue
         rect = [int(x) for x in rect.split()]
         if len(rect) != 4:
-            print(f"Error: Image '{name}' has an invalid rect attribute")
+            print(Fore.RED + f"Error: Image '{name}' has an invalid rect attribute")
             continue
         x, y, w, h = rect[0], rect[1], rect[2], rect[3]
 
@@ -328,12 +359,107 @@ def cut_sprites(image_file, xml_file):
         
         print(f"Extracted {name}")
         
-    print("Sprites Extracted.")
-# Example usage:
-root = Tk()
-root.withdraw()
-data = tkinter.filedialog.askopenfilename(filetypes =[('IMAGELIST', '*.imagelist'),('All Files', '*.*')],
-                                        title='Select Data File to use')
-image = tkinter.filedialog.askopenfilename(filetypes =[('All Files', '*.*'),('PNG', '*.png'),('JPG', '*.jpg'),('WEBP', '*.webp'),('WALTEX', '*.waltex')],
-                                        title='Select Image File to use')
-cut_sprites(image, data)
+    print(Fore.GREEN + f"All sprites extracted from {os.path.basename(image_file)}")
+    
+#INITIATING SCRIPT
+def extractor():
+    line = "-----------------------------------------------------------------------------------------------------------"
+    print(line)
+    print(Style.BRIGHT + Fore.GREEN + "                              WMW-Extractor | Version 1.0.0 | by E12Dragon")
+    print("                                   github.com/E12Dragon/WMW-Extractor")
+    print(line)
+    print(Style.NORMAL + Back.GREEN + Fore.BLACK + " FUNCTIONS                                                              ")
+    print("    1 Extract sprites from all files")
+    print("    2 Extract sprites from specific files")
+    print("    3 Convert all WALTEX to PNG")
+    print("    4 Convert specific WALTEX to PNG")
+    print(Style.NORMAL + Back.GREEN + Fore.BLACK + " OTHER                                                                  ")
+    print("  101 Clear input directory")
+    print("  102 Clear extracted sprites directory")
+    print("  103 Clear extracted WALTEX directory")
+    print("  104 Quit extractor")
+    print(line)
+    choice = input("Your Choice: ")
+    print(line)
+    
+    #Define and if needed create input directory
+    input_dir = "in/"
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
+    
+    #Find all texture and xml files in the "in" folder and extract the sprites from them
+    if choice == '1':
+        # get list of files in input directory
+        input_files = os.listdir(input_dir)
+
+        # filter out non-data and non-image files
+        xml_files = [f for f in input_files if f.endswith('.imagelist')]
+        image_files = [f for f in input_files if f.endswith('.png') or f.endswith('.jpg') or f.endswith('.webp') or f.endswith('.waltex')]
+
+        # process image and data files together
+        for image_file in image_files:
+            image_base = os.path.splitext(image_file)[0]
+            image_base = image_base.replace('_split_1', '').replace('_split_2', '').replace('_split_3', '') #this is a lazy way to deal with splits but it works
+            xml_file = next((f for f in xml_files if os.path.splitext(f)[0] == image_base), None)
+            if xml_file:
+                xml_file = os.path.join(input_dir, xml_file)
+                print(Fore.BLUE + f"Processing {os.path.basename(xml_file)} and {image_file}")
+                cut_sprites(os.path.join(input_dir, image_file), xml_file)
+            else:
+                print(Fore.RED + f'{image_base}.imagelist does not exist!')
+    #Use tkinter to get the user to provide a single pair of texture and xml files.
+    elif choice == '2':
+        root = Tk()
+        root.withdraw()
+        xml_file = tkinter.filedialog.askopenfilename(filetypes =[('IMAGELIST', '*.imagelist'),('All Files', '*.*')],
+                                                title='Select Data File to use')
+        image_file = tkinter.filedialog.askopenfilename(filetypes =[('All Files', '*.*'),('PNG', '*.png'),('JPG', '*.jpg'),('WEBP', '*.webp'),('WALTEX', '*.waltex')],
+                                                title='Select Image File to use')
+        if image_file == '':  
+            print(Fore.RED + "You must provide a texture file!")
+        elif xml_file == '':  
+            print(Fore.RED + "You must provide an imagelist file!")
+        else:
+            cut_sprites(image_file, xml_file)
+    elif choice == '3':
+        # get list of files in input directory
+        input_files = os.listdir(input_dir)
+
+        # filter out non-waltex files
+        image_files = [f for f in input_files if f.endswith('.waltex')]
+            
+        # Check if there are any waltex files and convert each one
+        if image_files == []:
+            print(Fore.RED + f'You must place a WALTEX file inside the "in" directory')
+        else:
+            for image_file in image_files:
+                image_base = os.path.splitext(image_file)[0]
+                image_base = image_base
+                image_file = os.path.join(input_dir, image_file)
+                print(Fore.BLUE + f"Processing {os.path.basename(image_file)}")
+                DefineWaltex(image_file)
+    #Use tkinter to get the user to provide the single waltex file
+    elif choice == '4':
+        root = Tk()
+        root.withdraw()
+        image_file = tkinter.filedialog.askopenfilename(filetypes =[('All Files', '*.*'),('WALTEX', '*.waltex')],
+                                                title='Select WALTEX File to use')
+        if image_file == '':  
+            print(Fore.RED + "You must provide a WALTEX file!")
+        else:
+            DefineWaltex(image_file)
+    elif choice == '101':
+        clear_directory("in")
+    elif choice == '102':
+        clear_directory("out-sprites")
+    elif choice == '103':
+        clear_directory("out-waltex")
+    elif choice == '104':
+        exit()
+    else:
+        print(Fore.RED + "Not a valid function!")
+    print(Back.WHITE + Fore.BLACK + 'Press ENTER to run WMW-Extractor again')
+    repeat = input()
+    if repeat == "":
+        extractor()
+extractor()
