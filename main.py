@@ -44,27 +44,18 @@ def DefineWaltex(image_file):
         if rawdata[:4].decode("utf-8") != "WALT":
             raise ValueError(Fore.RED + "Not a valid WALTex file")
         tex_fmt = rawdata[5]
-        tex_size = rawdata[7]
+        offset = 16
         #Find what waltex format it is
         if tex_fmt == 0x0:
             print('WALTEX rgba8888 format detected.')
             rawcolor = 'abgr8888'
-            offset = 16
             width = int.from_bytes(rawdata[6:8], "little")
             height = int.from_bytes(rawdata[8:10], "little")
         elif tex_fmt == 0x3:
+            print('WALTEX rgba4444 format detected.')
             rawcolor = 'rgba4444'
-            offset = 16
-            #Some rgba4444s have width and height flipped, this byte seems to be the answer
-            if tex_size == 0x3:
-                print('WALTEX rgba4444 format detected. Flipped dimensions.')
-                height = int.from_bytes(rawdata[6:8], "little")
-                width = int.from_bytes(rawdata[8:10], "little")
-            #Normal version
-            else:
-                print('WALTEX rgba4444 format detected.')
-                width = int.from_bytes(rawdata[6:8], "little")
-                height = int.from_bytes(rawdata[8:10], "little")
+            width = int.from_bytes(rawdata[6:8], "little")
+            height = int.from_bytes(rawdata[8:10], "little")
         else:
             raise ValueError(Fore.RED + "Unknown texture format")
             
@@ -365,7 +356,7 @@ def cut_sprites(image_file, xml_file):
 def extractor():
     line = "-----------------------------------------------------------------------------------------------------------"
     print(line)
-    print(Style.BRIGHT + Fore.GREEN + "                              WMW-Extractor | Version 1.0.0 | by E12Dragon")
+    print(Style.BRIGHT + Fore.GREEN + "                              WMW-Extractor | Version 1.0.1 | by E12Dragon")
     print("                                   github.com/E12Dragon/WMW-Extractor")
     print(line)
     print(Style.NORMAL + Back.GREEN + Fore.BLACK + " FUNCTIONS                                                              ")
